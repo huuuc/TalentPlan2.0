@@ -3,7 +3,6 @@ package server
 import (
 	"os"
 	"testing"
-
 	"github.com/pingcap-incubator/tinykv/kv/config"
 	"github.com/pingcap-incubator/tinykv/kv/storage"
 	"github.com/pingcap-incubator/tinykv/kv/storage/standalone_storage"

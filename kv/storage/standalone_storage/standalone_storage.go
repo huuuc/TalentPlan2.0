@@ -82,8 +82,8 @@ func (s *StandAloneStorage) Write(ctx *kvrpcpb.Context, batch []storage.Modify) 
 
 func (s *StandAloneReader) GetCF(cf string, key []byte) ([]byte, error) {
 	value, err := engine_util.GetCFFromTxn(s.kvTxn, cf, key)
-	if err != nil {
-		return nil, err
+	if err == badger.ErrKeyNotFound {
+		return nil, nil
 	}
 	return value, err
 }

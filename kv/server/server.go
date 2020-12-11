@@ -40,18 +40,12 @@ func (server *Server) RawGet(_ context.Context, req *kvrpcpb.RawGetRequest) (*kv
 	// Your Code Here (1).
 	storageReader, err := server.storage.Reader(req.Context)
 	if err != nil{
-		return nil,err
+		return &kvrpcpb.RawGetResponse{}, err
 	}
-	var rawGet *kvrpcpb.RawGetResponse = &kvrpcpb.RawGetResponse{
-		Error: nil,
-		Value: nil,
-		NotFound: nil,
-	}
+	var rawGet *kvrpcpb.RawGetResponse = &kvrpcpb.RawGetResponse{}
 	rawGet.Value, err = storageReader.GetCF(req.GetCf(), req.Key)
-	if err != nil{
+	if rawGet.Value == nil{
 		rawGet.NotFound = true
-		rawGet.Error = err.Error()
-		return rawGet, err
 	}
 	return rawGet, nil
 }
@@ -86,9 +80,7 @@ func (server *Server) RawDelete(_ context.Context, req *kvrpcpb.RawDeleteRequest
 	}
 	err := server.storage.Write(req.Context, []storage.Modify{batch})
 	if err !=nil{
-		return &kvrpcpb.RawDeleteResponse{
-			Error: err.Error(),
-		}, err
+		return nil, nil
 	}
 	return &kvrpcpb.RawDeleteResponse{}, nil
 }
@@ -97,15 +89,16 @@ func (server *Server) RawScan(_ context.Context, req *kvrpcpb.RawScanRequest) (*
 	// Your Code Here (1).
 	storageReader,err :=server.storage.Reader(req.Context)
 	if err != nil{
-		return nil, err
+		return &kvrpcpb.RawScanResponse{}, err
 	}
 	kvPairs := []*kvrpcpb.KvPair{}
 	dbIter := storageReader.IterCF(req.Cf)
+	dbIter.Seek(req.StartKey)
 	numLimit := req.Limit
 	for dbIter.Valid() != false{
 		var kvPair = &kvrpcpb.KvPair{}
 		kvPair.Key = dbIter.Item().Key()
-		kvPair.Value,err = dbIter.Item().Value()
+		kvPair.Value, _ = dbIter.Item().Value()
 		kvPairs = append(kvPairs, kvPair)
 		numLimit--
 		if numLimit == 0{
