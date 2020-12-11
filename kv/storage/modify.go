@@ -30,7 +30,6 @@ func (m *Modify) Value() []byte {
 	if putData, ok := m.Data.(Put); ok {
 		return putData.Value
 	}
-
 	return nil
 }
 
