@@ -90,14 +90,11 @@ func TestLeaderBcastBeat2AA(t *testing.T) {
 	r := newTestRaft(1, []uint64{1, 2, 3}, 10, hi, NewMemoryStorage())
 	r.becomeCandidate()
 	r.becomeLeader()
-
 	r.Step(pb.Message{MsgType: pb.MessageType_MsgPropose, Entries: []*pb.Entry{{}}})
 	r.readMessages() // clear message
-
 	for i := 0; i < hi; i++ {
 		r.tick()
 	}
-
 	msgs := r.readMessages()
 	sort.Sort(messageSlice(msgs))
 	wmsgs := []pb.Message{
