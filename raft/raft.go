@@ -261,12 +261,10 @@ func (r *Raft) reStart(){
 func (r *Raft) becomeFollower(term uint64, lead uint64) {
 	// Your Code Here (2A).
 	r.reStart()
-	if r.Term <= term{
-		r.State=StateFollower
-		r.Term=term
-		r.Vote=None
-		r.Lead=lead
-	}
+	r.State=StateFollower
+	r.Term=term
+	r.Vote=None
+	r.Lead=lead
 }
 
 // becomeCandidate transform this peer's state to candidate
@@ -302,6 +300,7 @@ func (r *Raft) becomeLeader() {
 	r.reStart()
 	r.State=StateLeader
 	r.Lead=r.id
+	r.Vote=None
 	return
 }
 
@@ -313,7 +312,7 @@ func (r *Raft) Step(m pb.Message) error {
 	case StateFollower:
 		switch m.MsgType {
 		case pb.MessageType_MsgAppend:
-			r.becomeFollower(m.Term,m.From)
+			r.handleAppendEntries(m)
 		case pb.MessageType_MsgHup:
 			r.becomeCandidate()
 			for peer,_:=range r.votes{
@@ -336,7 +335,7 @@ func (r *Raft) Step(m pb.Message) error {
 				}
 			}
 		case pb.MessageType_MsgAppend:
-			r.becomeFollower(m.Term,m.From)
+			r.handleAppendEntries(m)
 		case pb.MessageType_MsgRequestVoteResponse:
 			r.handleVoteResponse(m)
 		case pb.MessageType_MsgHeartbeat:
@@ -359,7 +358,7 @@ func (r *Raft) Step(m pb.Message) error {
 				}
 			}
 		case pb.MessageType_MsgAppend:
-			r.becomeFollower(m.Term,m.From)
+			r.handleAppendEntries(m)
 		case pb.MessageType_MsgHeartbeat:
 			r.handleHeartbeat(m)
 		case pb.MessageType_MsgRequestVote:
@@ -373,6 +372,7 @@ func (r *Raft) Step(m pb.Message) error {
 // handleAppendEntries handle AppendEntries RPC request
 func (r *Raft) handleAppendEntries(m pb.Message) {
 	// Your Code Here (2A).
+	r.becomeFollower(m.Term,m.From)
 }
 // handleVoteResponse handle the vote request from each candidate
 func (r *Raft) handleRequestVote(m pb.Message){
@@ -382,11 +382,10 @@ func (r *Raft) handleRequestVote(m pb.Message){
 		Term: r.Term,
 		MsgType: pb.MessageType_MsgRequestVoteResponse,
 	}
-	msg.Reject=true
-	if r.State==StateLeader || r.State==StateCandidate{
-		r.msgs=append(r.msgs,msg)
-		return
+	if m.Term>r.Term{
+		r.becomeFollower(m.Term,None)
 	}
+	msg.Reject=true
 	if (r.Vote==None || r.Vote==m.From) && (r.RaftLog.LastTerm()<m.LogTerm ||
 		r.RaftLog.LastTerm()==m.LogTerm && r.RaftLog.LastIndex()<=m.Index) {
 		msg.Reject = false
