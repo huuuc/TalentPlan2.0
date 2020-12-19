@@ -152,7 +152,6 @@ func TestLeaderElectionOverwriteNewerLogs2AB(t *testing.T) {
 	if sm1.Term != 2 {
 		t.Errorf("term = %d, want 2", sm1.Term)
 	}
-
 	// Node 1 campaigns again with a higher term. This time it succeeds.
 	n.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgHup})
 	if sm1.State != StateLeader {
@@ -360,6 +359,7 @@ func TestDuelingCandidates2AB(t *testing.T) {
 
 	// 3 stays as candidate since it receives a vote from 3 and a rejection from 2
 	sm = nt.peers[3].(*Raft)
+
 	if sm.State != StateCandidate {
 		t.Errorf("state = %s, want %s", sm.State, StateCandidate)
 	}
@@ -463,7 +463,7 @@ func TestOldMessages2AB(t *testing.T) {
 	tt.send(pb.Message{From: 2, To: 1, MsgType: pb.MessageType_MsgAppend, Term: 2, Entries: []*pb.Entry{{Index: 3, Term: 2}}})
 	// commit a new entry
 	tt.send(pb.Message{From: 1, To: 1, MsgType: pb.MessageType_MsgPropose, Entries: []*pb.Entry{{Data: []byte("somedata")}}})
-
+	fmt.Println()
 	ilog := newLog(
 		&MemoryStorage{
 			ents: []pb.Entry{
@@ -478,6 +478,8 @@ func TestOldMessages2AB(t *testing.T) {
 		if sm, ok := p.(*Raft); ok {
 			l := ltoa(sm.RaftLog)
 			if g := diffu(base, l); g != "" {
+				fmt.Println(l)
+				fmt.Println(base)
 				t.Errorf("#%d: diff:\n%s", i, g)
 			}
 		} else {
