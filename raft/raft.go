@@ -537,6 +537,7 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message){
 		return
 	}
 	if r.RaftLog.LastIndex()<m.Index{
+		r.becomeFollower(m.Term,None)
 		return
 	}
 	if m.Reject==true{
@@ -576,12 +577,13 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message){
 }
 
 
-// handleVoteResponse handle the vote response from each peer
+// handleVoteResponse handle the vte response from each peer
 func (r *Raft) handleVoteResponse(m pb.Message){
 	num:=0
 	r.getVotes++
-	if m.LogTerm>=r.Term{
+	if m.LogTerm>=r.Term&&m.Reject==true{
 		r.becomeFollower(m.Term,None)
+		return
 	}
 	if m.Reject==false{
 		r.votes[m.From]=true
@@ -598,7 +600,7 @@ func (r *Raft) handleVoteResponse(m pb.Message){
 		r.becomeLeader()
 	} else if int(r.getVotes)-num>len(r.votes)/2{
 		r.becomeFollower(r.Term,None)
-}
+	}
 }
 
 // handleHeartbeat handle Heartbeat RPC request
