@@ -162,7 +162,6 @@ func (rn *RawNode) Ready() Ready {
 	ready := Ready{
 		Entries:          raft.RaftLog.unstableEntries(),
 		CommittedEntries: raft.RaftLog.nextEnts(),
-		Messages:         raft.msgs,
 	}
 	currentSoftState := &SoftState{
 		Lead: raft.Lead,
