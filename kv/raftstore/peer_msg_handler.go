@@ -114,6 +114,27 @@ func (d *peerMsgHandler) proposeRaftCommand(msg *raft_cmdpb.RaftCmdRequest, cb *
 		return
 	}
 	// Your Code Here (2B).
+	if msg.AdminRequest!=nil{
+		d.proposeAdminRequest(msg,cb)
+	} else{
+		d.proposeRequest(msg,cb)
+	}
+}
+
+//proposeAdminRequest handle the Admin request
+func (d *peerMsgHandler) proposeAdminRequest(msg *raft_cmdpb.RaftCmdRequest, cb *message.Callback) {
+	switch msg.AdminRequest.CmdType {
+	case raft_cmdpb.AdminCmdType_InvalidAdmin:
+	case raft_cmdpb.AdminCmdType_ChangePeer:
+
+	case raft_cmdpb.AdminCmdType_CompactLog:
+
+	}
+}
+
+//proposeRequest handle request
+func (d *peerMsgHandler) proposeRequest(msg *raft_cmdpb.RaftCmdRequest, cb *message.Callback) {
+
 }
 
 func (d *peerMsgHandler) onTick() {
