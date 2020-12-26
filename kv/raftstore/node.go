@@ -50,7 +50,6 @@ func (n *Node) Start(ctx context.Context, engines *engine_util.Engines, trans Tr
 		return err
 	}
 	n.store.Id = storeID
-
 	firstRegion, err := n.checkOrPrepareBootstrapCluster(ctx, engines, storeID)
 	if err != nil {
 		return err
@@ -71,7 +70,6 @@ func (n *Node) Start(ctx context.Context, engines *engine_util.Engines, trans Tr
 	if err = n.startNode(engines, trans, snapMgr); err != nil {
 		return err
 	}
-
 	return nil
 }
 

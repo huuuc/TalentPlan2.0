@@ -121,7 +121,6 @@ func (c *Cluster) Start() {
 	if resp.Header != nil && resp.Header.Error != nil {
 		panic(resp.Header.Error)
 	}
-
 	for storeID, engine := range c.engines {
 		store := &metapb.Store{
 			Id:      storeID,

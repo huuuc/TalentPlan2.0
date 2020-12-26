@@ -16,7 +16,6 @@ package raft
 
 import (
 	"errors"
-
 	pb "github.com/pingcap-incubator/tinykv/proto/pkg/eraftpb"
 )
 
@@ -162,6 +161,7 @@ func (rn *RawNode) Ready() Ready {
 	ready := Ready{
 		Entries:          raft.RaftLog.unstableEntries(),
 		CommittedEntries: raft.RaftLog.nextEnts(),
+		Messages: rn.Raft.msgs,
 	}
 	currentSoftState := &SoftState{
 		Lead: raft.Lead,
