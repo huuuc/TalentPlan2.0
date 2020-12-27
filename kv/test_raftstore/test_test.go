@@ -388,7 +388,6 @@ func TestOnePartition2B(t *testing.T) {
 	MustGetNone(cluster.engines[s2[0]], []byte("k1"))
 	MustGetNone(cluster.engines[s2[1]], []byte("k1"))
 	cluster.ClearFilters()
-
 	// old leader in minority, new leader should be elected
 	s2 = append(s2, s1[2])
 	s1 = s1[:2]

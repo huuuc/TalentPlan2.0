@@ -97,6 +97,15 @@ func (d *peerMsgHandler) process(entry * eraftpb.Entry){
 func (d *peerMsgHandler) processRequest(entry * eraftpb.Entry,msg raft_cmdpb.RaftCmdRequest){
 	req:=msg.Requests[0]
 	var prop *proposal
+	kvWB:=new(engine_util.WriteBatch)
+	fmt.Println(req.CmdType)
+	if req.CmdType==raft_cmdpb.CmdType_Put{
+		kvWB.SetCF(req.Put.Cf,req.Put.Key,req.Put.Value)
+	}
+	if req.CmdType==raft_cmdpb.CmdType_Delete{
+		kvWB.DeleteCF(req.Delete.Cf,req.Delete.Key)
+	}
+	kvWB.WriteToDB(d.peerStorage.Engines.Kv)
 	if len(d.proposals)==0{
 		return
 	}
@@ -120,7 +129,7 @@ func (d *peerMsgHandler) processRequest(entry * eraftpb.Entry,msg raft_cmdpb.Raf
 	var resp *raft_cmdpb.RaftCmdResponse
 	switch req.CmdType {
 	case raft_cmdpb.CmdType_Get:
-		resp=d.handleGetCommand(entry,req)
+		resp=d.handleGetCommand(req)
 	case raft_cmdpb.CmdType_Put:
 		resp=d.handlePutCommand(req)
 	case raft_cmdpb.CmdType_Delete:
@@ -129,18 +138,20 @@ func (d *peerMsgHandler) processRequest(entry * eraftpb.Entry,msg raft_cmdpb.Raf
 		resp=d.handleSnapCommand()
 		prop.cb.Txn=d.peerStorage.Engines.Kv.NewTransaction(false)
 	}
-	fmt.Println(req.CmdType)
 	prop.cb.Done(resp)
 	d.proposals=d.proposals[1:]
 	return
 }
 
 // handleGetCommand handle get command
-func (d *peerMsgHandler) handleGetCommand(entry * eraftpb.Entry,req *raft_cmdpb.Request) *raft_cmdpb.RaftCmdResponse{
+func (d *peerMsgHandler) handleGetCommand(req *raft_cmdpb.Request) *raft_cmdpb.RaftCmdResponse{
 	resp:=&raft_cmdpb.RaftCmdResponse{
 		Header: &raft_cmdpb.RaftResponseHeader{},
 	}
-	value,_:=engine_util.GetCF(d.peerStorage.Engines.Kv,req.Get.Cf,req.Get.Key)
+	value,err:=engine_util.GetCF(d.peerStorage.Engines.Kv,req.Get.Cf,req.Get.Key)
+	if err != nil {
+		value = nil
+	}
 	resp.Responses=[]*raft_cmdpb.Response{{
 		CmdType: raft_cmdpb.CmdType_Get,
 		Get: &raft_cmdpb.GetResponse{Value: value}}}
@@ -152,9 +163,6 @@ func (d *peerMsgHandler) handlePutCommand(req *raft_cmdpb.Request) *raft_cmdpb.R
 	resp:=&raft_cmdpb.RaftCmdResponse{
 		Header: &raft_cmdpb.RaftResponseHeader{},
 	}
-	kvWB:=new(engine_util.WriteBatch)
-	kvWB.SetCF(req.Put.Cf,req.Put.Key,req.Put.Value)
-	kvWB.WriteToDB(d.peerStorage.Engines.Kv)
 	resp.Responses=[]*raft_cmdpb.Response{{
 		CmdType: raft_cmdpb.CmdType_Put,
 		Put: &raft_cmdpb.PutResponse{}}}
@@ -166,9 +174,6 @@ func (d *peerMsgHandler) handleDeleteCommand(req *raft_cmdpb.Request) *raft_cmdp
 	resp:=&raft_cmdpb.RaftCmdResponse{
 		Header: &raft_cmdpb.RaftResponseHeader{},
 	}
-	kvWB:=new(engine_util.WriteBatch)
-	kvWB.DeleteCF(req.Delete.Cf,req.Delete.Key)
-	kvWB.WriteToDB(d.peerStorage.Engines.Kv)
 	resp.Responses=[]*raft_cmdpb.Response{{
 		CmdType: raft_cmdpb.CmdType_Delete,
 		Delete: &raft_cmdpb.DeleteResponse{}}}
