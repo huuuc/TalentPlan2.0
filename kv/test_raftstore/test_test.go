@@ -204,7 +204,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		clnts[i] = make(chan int, 1)
 	}
 	for i := 0; i < 3; i++ {
-		// log.Printf("Iteration %v\n", i)
+		fmt.Println("Iteration ", i)
 		atomic.StoreInt32(&done_clients, 0)
 		atomic.StoreInt32(&done_partitioner, 0)
 		go SpawnClientsAndWait(t, ch_clients, nclients, func(cli int, t *testing.T) {
@@ -260,7 +260,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 			time.Sleep(electionTimeout)
 		}
 
-		// log.Printf("wait for clients\n")
+		fmt.Println("wait for clients")
 		<-ch_clients
 
 		if crash {
@@ -279,7 +279,7 @@ func GenericTest(t *testing.T, part string, nclients int, unreliable bool, crash
 		}
 
 		for cli := 0; cli < nclients; cli++ {
-			// log.Printf("read from clients %d\n", cli)
+			log.Infof("read from clients %d\n", cli)
 			j := <-clnts[cli]
 
 			// if j < 10 {
