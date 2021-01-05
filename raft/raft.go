@@ -202,6 +202,23 @@ func (r *Raft) sendAppend(to uint64) bool {
 	logIndex:=r.Prs[to].Next-1
 	logTerm,err:=r.RaftLog.Term(logIndex)
 	if err != nil {
+		if err==ErrCompacted{
+			// send snapshot append
+			snapshot,err:=r.RaftLog.storage.Snapshot()
+			if err!=nil{
+				return false
+			}
+			msg:=pb.Message{
+				Term: r.Term,
+				From: r.id,
+				To: to,
+				MsgType: pb.MessageType_MsgSnapshot,
+				Snapshot: &snapshot,
+			}
+			r.msgs=append(r.msgs,msg)
+			r.Prs[to].Next=snapshot.Metadata.Index+1
+			return true
+		}
 		panic(err)
 	}
 	msg:=pb.Message{
@@ -657,6 +674,7 @@ func (r *Raft) handleSnapshot(m pb.Message) {
 	}
 	r.becomeFollower(m.Term,m.From)
 	r.RaftLog.entries=nil
+	r.RaftLog.LastIndex()
 	r.RaftLog.FirstIndex=m.Snapshot.Metadata.Index+1
 	r.RaftLog.committed=m.Snapshot.Metadata.Index
 	r.RaftLog.stabled=m.Snapshot.Metadata.Index

@@ -124,7 +124,18 @@ func (l *RaftLog) LastTerm() uint64 {
 func (l *RaftLog) Term(i uint64) (uint64, error) {
 	// Your Code Here (2A).
 	if len(l.entries) > 0 && i >= l.FirstIndex {
+		// index i is in l.entries
 		return l.entries[i-l.FirstIndex].Term, nil
 	}
-	return l.storage.Term(i)
+	term,err:=l.storage.Term(i)
+	if err!=nil&&!IsEmptySnap(l.pendingSnapshot){
+		if i==l.pendingSnapshot.Metadata.Index {
+			// index i is l.pendingSnapshot's last log index
+			return l.pendingSnapshot.Metadata.Term,nil
+		} else {
+			// index i has compacted
+			return term,ErrCompacted
+		}
+	}
+	return term,err
 }

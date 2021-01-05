@@ -83,14 +83,11 @@ func (d *peerMsgHandler) process(entry * eraftpb.Entry,kvWB *engine_util.WriteBa
 	if err!=nil{
 		panic(err)
 	}
-	if msg.AdminRequest!=nil{
-		return kvWB
-	}
 	if len(msg.Requests)>0{
 		return d.processRequest(entry,msg,kvWB)
 	}
 	if msg.AdminRequest!=nil{
-		d.processAdminRequest(entry,msg)
+		return d.processAdminRequest(entry,msg,kvWB)
 	}
 	return kvWB
 }
@@ -198,8 +195,7 @@ func (d *peerMsgHandler) handleSnapCommand() *raft_cmdpb.RaftCmdResponse{
 }
 
 // processAdminRequest handle Admin Request
-func (d *peerMsgHandler) processAdminRequest(entry * eraftpb.Entry,msg raft_cmdpb.RaftCmdRequest){
-	kvWB:=new(engine_util.WriteBatch)
+func (d *peerMsgHandler) processAdminRequest(entry * eraftpb.Entry,msg raft_cmdpb.RaftCmdRequest, kvWB *engine_util.WriteBatch) *engine_util.WriteBatch{
 	switch msg.AdminRequest.CmdType {
 	case raft_cmdpb.AdminCmdType_CompactLog:
 		compactLog:=msg.AdminRequest.GetCompactLog()
@@ -208,10 +204,10 @@ func (d *peerMsgHandler) processAdminRequest(entry * eraftpb.Entry,msg raft_cmdp
 			applyState.TruncatedState.Index = compactLog.CompactIndex
 			applyState.TruncatedState.Term = compactLog.CompactTerm
 			kvWB.SetMeta(meta.ApplyStateKey(d.regionId), applyState)
-			kvWB.WriteToDB(d.peerStorage.Engines.Kv)
 			d.ScheduleCompactLog(d.RaftGroup.Raft.RaftLog.FirstIndex, applyState.TruncatedState.Index)
 		}
 	}
+	return kvWB
 }
 
 
