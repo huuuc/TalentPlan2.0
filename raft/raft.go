@@ -390,6 +390,17 @@ func (r *Raft) Step(m pb.Message) error {
 			r.handleAppendEntriesResponse(m)
 		case pb.MessageType_MsgSnapshot:
 			r.handleSnapshot(m)
+		case pb.MessageType_MsgTimeoutNow:
+			_,find:=r.Prs[r.id]
+			if !find{
+				return nil
+			}
+			r.Step(pb.Message{MsgType: pb.MessageType_MsgHup})
+		case pb.MessageType_MsgTransferLeader:
+			if r.Lead != None {
+				m.To = r.Lead
+				r.msgs = append(r.msgs, m)
+			}
 		}
 	case StateCandidate:
 		switch m.MsgType {
@@ -419,6 +430,13 @@ func (r *Raft) Step(m pb.Message) error {
 			r.handleAppendEntriesResponse(m)
 		case pb.MessageType_MsgSnapshot:
 			r.handleSnapshot(m)
+		case pb.MessageType_MsgTimeoutNow:
+			r.Step(pb.Message{MsgType: pb.MessageType_MsgHup})
+		case pb.MessageType_MsgTransferLeader:
+			if r.Lead != None {
+				m.To = r.Lead
+				r.msgs = append(r.msgs, m)
+			}
 		}
 	case StateLeader:
 		switch m.MsgType {
@@ -442,6 +460,9 @@ func (r *Raft) Step(m pb.Message) error {
 			r.handleSnapshot(m)
 		case pb.MessageType_MsgHeartbeatResponse:
 			r.sendAppend(m.From)
+		case pb.MessageType_MsgTransferLeader:
+			r.handleTransferLeader(m)
+
 		}
 	}
 	return nil
@@ -454,12 +475,12 @@ func (r *Raft) appendEntries(m pb.Message){
 	for i, entry := range entries {
 		entry.Index = lastIndex + uint64(i) + 1
 		entry.Term = r.Term
-		//if entry.EntryType == pb.EntryType_EntryConfChange {
-		//	if r.PendingConfIndex != None {
-		//		continue
-		//	}
-		//	r.PendingConfIndex = entry.Index
-		//}
+		if entry.EntryType == pb.EntryType_EntryConfChange {
+			if r.PendingConfIndex != None {
+				continue
+			}
+			r.PendingConfIndex = entry.Index
+		}
 		r.RaftLog.entries = append(r.RaftLog.entries, *entry)
 	}
 	r.Prs[r.id].Match = r.RaftLog.LastIndex()
@@ -585,31 +606,34 @@ func (r *Raft) handleAppendEntriesResponse(m pb.Message){
 	if m.Index>r.Prs[m.From].Match{
 		r.Prs[m.From].Match=m.Index
 		r.Prs[m.From].Next=m.Index+1
-		//reset committed
-		matches:=make(uint64Slice,len(r.Prs))
-		i:=0
-		for _,val:=range r.Prs{
-			matches[i]=val.Match
-			i++
+		r.resetCommitted()
+	}
+}
+
+//reset committed
+func (r *Raft)resetCommitted(){
+	matches:=make(uint64Slice,len(r.Prs))
+	i:=0
+	for _,val:=range r.Prs{
+		matches[i]=val.Match
+		i++
+	}
+	sort.Sort(matches)
+	committed:=matches[(len(r.Prs)-1)/2]
+	if committed>r.RaftLog.committed{
+		logTerm,err:=r.RaftLog.Term(committed)
+		if err!=nil{
+			panic(err)
 		}
-		sort.Sort(matches)
-		committed:=matches[(len(r.Prs)-1)/2]
-		if committed>r.RaftLog.committed{
-			logTerm,err:=r.RaftLog.Term(committed)
-			if err!=nil{
-				panic(err)
-			}
-			if logTerm==r.Term {
-				r.RaftLog.committed=committed
-				for peer,_:=range r.Prs {
-					if peer!=r.id{
-						r.sendAppend(peer)
-					}
+		if logTerm==r.Term {
+			r.RaftLog.committed=committed
+			for peer,_:=range r.Prs {
+				if peer!=r.id{
+					r.sendAppend(peer)
 				}
 			}
 		}
 	}
-	return
 }
 
 
@@ -688,12 +712,54 @@ func (r *Raft) handleSnapshot(m pb.Message) {
 	r.msgs=append(r.msgs,msg)
 }
 
+
+func (r *Raft) handleTransferLeader(m pb.Message){
+	transferee:=m.From
+	if m.From==r.id{
+		//leader don't have to transfer to leader
+		return
+	}
+	_,find:=r.Prs[transferee]
+	if !find{
+		// can't find the transferee
+		return
+	}
+	if r.leadTransferee==m.From{
+		// transferee has been removed
+		return
+	}
+	r.leadTransferee=transferee
+	if r.Prs[transferee].Match!=r.RaftLog.LastIndex(){
+		r.sendAppend(transferee)
+	}
+	msg:=pb.Message{
+		From: r.id,
+		To: transferee,
+		MsgType: pb.MessageType_MsgTimeoutNow,
+	}
+	r.msgs=append(r.msgs,msg)
+}
+
 // addNode add a new node to raft group
 func (r *Raft) addNode(id uint64) {
 	// Your Code Here (3A).
+	_,find:=r.Prs[id]
+	if !find{
+		r.Prs[id]=&Progress{Next: r.RaftLog.FirstIndex}
+	}
+	r.PendingConfIndex=None
 }
 
 // removeNode remove a node from raft group
 func (r *Raft) removeNode(id uint64) {
 	// Your Code Here (3A).
+	_,find:=r.Prs[id]
+	if find{
+		delete(r.Prs,id)
+		if r.State==StateLeader{
+			r.resetCommitted()
+		}
+	}
+
+	r.PendingConfIndex=None
 }
